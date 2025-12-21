@@ -1,23 +1,14 @@
 #!/bin/bash
 
 # 1. Copy the dataset to /home
-# echo "--- Copying Dataset ---"
-# if [ -d "/home/Task10_Colon_Preprocessed" ]; then
-#     echo "Dataset already exists in /home, skipping copy."
-# else
-#     # Using -r for recursive and -p to preserve timestamps/permissions
-#     cp -rp /workspace/Task10_Colon_Preprocessed /home/
-#     echo "Dataset copied successfully."
-# fi
-
-# 1. Create a folder for the mount point
-mkdir -p /mnt/ramdisk
-
-mount -t tmpfs -o size=10G tmpfs /mnt/ramdisk
-
-rsync -av --progress /workspace/Task10_Colon_Preprocessed/ /mnt/ramdisk/
-
-chmod -R 777 /mnt/ramdisk
+echo "--- Copying Dataset ---"
+if [ -d "/home/Task10_Colon_Preprocessed" ]; then
+    echo "Dataset already exists in /home, skipping copy."
+else
+    # Using -r for recursive and -p to preserve timestamps/permissions
+    cp -rp /workspace/Task10_Colon_Preprocessed /home/
+    echo "Dataset copied successfully."
+fi
 
 # 2. Install nano and essential libraries
 echo "--- Installing Nano and System Dependencies ---"
