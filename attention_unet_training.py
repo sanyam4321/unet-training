@@ -23,6 +23,9 @@ from monai.metrics import DiceMetric
 from monai.inferers import sliding_window_inference
 from torch.optim import Adam
 
+torch.backends.cudnn.benchmark = False
+torch.backends.cudnn.deterministic = True
+
 class DoubleConv(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(DoubleConv, self).__init__()
