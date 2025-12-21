@@ -193,9 +193,7 @@ with open(log_filename, "w", newline="") as f:
 
 print(f"Logging metrics to {log_filename}")
 
-from torch.cuda.amp import GradScaler, autocast
-
-scaler = GradScaler()
+scaler = torch.amp.GradScaler(device="cuda")
 
 
 for epoch in range(max_epochs):
@@ -211,7 +209,7 @@ for epoch in range(max_epochs):
 
         optimizer.zero_grad()
 
-        with autocast():
+        with torch.amp.autocast(device_type="cuda", dtype=torch.bfloat16):
             outputs = model(inputs)
             loss = loss_function(outputs, labels)
             
@@ -221,7 +219,6 @@ for epoch in range(max_epochs):
 
         epoch_loss += loss.item()
         
-    scheduler.step()
     epoch_loss /= step
     print(f"epoch {epoch + 1} average loss: {epoch_loss:.4f}")
     
