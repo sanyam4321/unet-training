@@ -12,18 +12,7 @@ fi
 
 # 2. Install nano and essential libraries
 echo "--- Installing Nano and System Dependencies ---"
-sudo apt-get update && sudo apt-get install -y nano
-
-# 3. Clone the repository
-echo "--- Cloning Repository ---"
-if [ -d "unet-training" ]; then
-    echo "Directory unet-training already exists. Pulling latest changes..."
-    cd unet-training
-    git pull
-else
-    git clone https://github.com/sanyam4321/unet-training.git
-    cd unet-training
-fi
+apt update && apt install -y nano
 
 # 4. Install requirements
 echo "--- Installing Python Requirements ---"
