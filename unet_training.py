@@ -40,7 +40,7 @@ class DoubleConv(nn.Module):
 
 
 class UNET3D(nn.Module):
-    def __init__(self, in_channels=1, out_channels=3):
+    def __init__(self, in_channels=1, out_channels=2):
         super(UNET3D, self).__init__()
 
         feature_maps = [64, 128, 256, 512, 1024]
