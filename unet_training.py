@@ -21,8 +21,7 @@ from monai.data import CacheDataset, DataLoader, decollate_batch
 from monai.losses import DiceCELoss
 from monai.metrics import DiceMetric
 from monai.inferers import sliding_window_inference
-from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
-from torch.optim import AdamW
+from torch.optim import Adam
 
 class DoubleConv(nn.Module):
     def __init__(self, in_channels, out_channels):
@@ -99,7 +98,7 @@ class UNET3D(nn.Module):
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = UNET3D(in_channels=1, out_channels=2).to(device)
-optimizer = AdamW(model.parameters(), lr=1e-4, weight_decay=1e-5)
+optimizer = Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
 
 data_dir = "/home/Task10_Colon_Preprocessed"
 train_images = sorted(glob.glob(os.path.join(data_dir, "imagesTr", "colon*.nii.gz")))
@@ -121,7 +120,7 @@ train_transforms = Compose([
         spatial_size=(128, 128, 64),
         pos=1,
         neg=1,
-        num_samples=32,
+        num_samples=8,
         image_key="image",
         image_threshold=0,
     ),
@@ -134,11 +133,11 @@ val_transforms = Compose([
     EnsureTyped(keys=["image", "label"]),
 ])
 
-train_ds = CacheDataset(data=train_files, transform=train_transforms, cache_rate=1.0, num_workers=8)
-train_loader = DataLoader(train_ds, batch_size=4, shuffle=True, num_workers=8)
+train_ds = CacheDataset(data=train_files, transform=train_transforms, cache_rate=1.0, num_workers=4)
+train_loader = DataLoader(train_ds, batch_size=2, shuffle=True, num_workers=4)
 
-val_ds = CacheDataset(data=val_files, transform=val_transforms, cache_rate=1.0, num_workers=8)
-val_loader = DataLoader(val_ds, batch_size=1, num_workers=8)
+val_ds = CacheDataset(data=val_files, transform=val_transforms, cache_rate=1.0, num_workers=4)
+val_loader = DataLoader(val_ds, batch_size=1, num_workers=4)
 
 max_epochs = 100
 warmup_epochs = 10
