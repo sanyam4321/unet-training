@@ -131,6 +131,8 @@ data_dir = "./Task10_Colon_Preprocessed"
 train_images = sorted(glob.glob(os.path.join(data_dir, "imagesTr", "colon*.nii.gz")))
 train_labels = sorted(glob.glob(os.path.join(data_dir, "labelsTr", "colon*.nii.gz")))
 
+print(f"images: {len(train_images)}")
+
 data_dicts = [{"image": image_name, "label": label_name} for image_name, label_name in zip(train_images, train_labels)]
 
 train_files, val_files = data_dicts[:-10], data_dicts[-10:]
@@ -160,7 +162,7 @@ val_transforms = Compose([
 ])
 
 train_ds = CacheDataset(data=train_files, transform=train_transforms, cache_rate=1.0, num_workers=8)
-train_loader = DataLoader(train_ds, batch_size=2, shuffle=True, num_workers=8)
+train_loader = DataLoader(train_ds, batch_size=4, shuffle=True, num_workers=8)
 
 val_ds = CacheDataset(data=val_files, transform=val_transforms, cache_rate=1.0, num_workers=8)
 val_loader = DataLoader(val_ds, batch_size=1, num_workers=8)
