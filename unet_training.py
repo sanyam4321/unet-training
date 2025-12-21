@@ -143,14 +143,8 @@ val_loader = DataLoader(val_ds, batch_size=1, num_workers=8)
 max_epochs = 100
 warmup_epochs = 10
 
-warmup_scheduler = LinearLR(optimizer, start_factor=0.1, total_iters=warmup_epochs)
-cosine_scheduler = CosineAnnealingLR(optimizer, T_max=max_epochs - warmup_epochs, eta_min=1e-6)
-
-scheduler = SequentialLR(
-    optimizer, 
-    schedulers=[warmup_scheduler, cosine_scheduler], 
-    milestones=[warmup_epochs]
-)
+from torch.optim.lr_scheduler import ReduceLROnPlateau
+scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=5)
 
 loss_function = DiceCELoss(to_onehot_y=True, softmax=True)
 dice_metric = DiceMetric(include_background=False, reduction="mean")
@@ -219,6 +213,7 @@ for epoch in range(max_epochs):
                 dice_metric(y_pred=val_outputs, y=val_labels)
 
             metric = dice_metric.aggregate().item()
+            scheduler.step(metric)
             current_val_metric = metric
             dice_metric.reset()
 
