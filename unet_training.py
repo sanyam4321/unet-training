@@ -97,6 +97,9 @@ class UNET3D(nn.Module):
 
         return self.segments(r_s1)
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = UNET3D(in_channels=1, out_channels=2).to(device)
+optimizer = AdamW(model.parameters(), lr=1e-4, weight_decay=1e-5)
 
 data_dir = "./Task10_Colon_Preprocessed"
 train_images = sorted(glob.glob(os.path.join(data_dir, "imagesTr", "colon*.nii.gz")))
@@ -136,12 +139,6 @@ train_loader = DataLoader(train_ds, batch_size=4, shuffle=True, num_workers=8)
 
 val_ds = CacheDataset(data=val_files, transform=val_transforms, cache_rate=1.0, num_workers=8)
 val_loader = DataLoader(val_ds, batch_size=1, num_workers=8)
-
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-model = UNET3D(in_channels=1, out_channels=2)
-model.to(device)
-optimizer = AdamW(model.parameters(), lr=1e-4, weight_decay=1e-5)
 
 max_epochs = 100
 warmup_epochs = 10
