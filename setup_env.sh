@@ -11,13 +11,13 @@
 # fi
 
 # 1. Create a folder for the mount point
-sudo mkdir -p /mnt/ramdisk
+mkdir -p /mnt/ramdisk
 
-sudo mount -t tmpfs -o size=10G tmpfs /mnt/ramdisk
+mount -t tmpfs -o size=10G tmpfs /mnt/ramdisk
 
-sudo rsync -av --progress /workspace/Task10_Colon_Preprocessed/ /mnt/ramdisk/
+rsync -av --progress /workspace/Task10_Colon_Preprocessed/ /mnt/ramdisk/
 
-sudo chmod -R 777 /mnt/ramdisk
+chmod -R 777 /mnt/ramdisk
 
 # 2. Install nano and essential libraries
 echo "--- Installing Nano and System Dependencies ---"
