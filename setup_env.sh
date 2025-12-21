@@ -13,7 +13,7 @@
 # 1. Create a folder for the mount point
 sudo mkdir -p /mnt/ramdisk
 
-sudo mount -t tmpfs -o size=40G tmpfs /mnt/ramdisk
+sudo mount -t tmpfs -o size=10G tmpfs /mnt/ramdisk
 
 sudo rsync -av --progress /workspace/Task10_Colon_Preprocessed/ /mnt/ramdisk/
 

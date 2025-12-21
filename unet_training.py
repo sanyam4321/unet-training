@@ -103,7 +103,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = UNET3D(in_channels=1, out_channels=2).to(device)
 optimizer = Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
 
-data_dir = "/home/Task10_Colon_Preprocessed"
+data_dir = "/mnt/ramdisk/Task10_Colon_Preprocessed"
 train_images = sorted(glob.glob(os.path.join(data_dir, "imagesTr", "colon*.nii.gz")))
 train_labels = sorted(glob.glob(os.path.join(data_dir, "labelsTr", "colon*.nii.gz")))
 
