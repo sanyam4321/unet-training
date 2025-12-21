@@ -123,7 +123,7 @@ train_transforms = Compose([
         spatial_size=(128, 128, 64),
         pos=1,
         neg=1,
-        num_samples=8,
+        num_samples=4,
         image_key="image",
         image_threshold=0,
     ),
@@ -136,10 +136,10 @@ val_transforms = Compose([
     EnsureTyped(keys=["image", "label"]),
 ])
 
-train_ds = CacheDataset(data=train_files, transform=train_transforms, cache_rate=1.0, num_workers=4)
-train_loader = DataLoader(train_ds, batch_size=3, shuffle=True, num_workers=4)
+train_ds = CacheDataset(data=train_files, transform=train_transforms, cache_rate=0.5, num_workers=4)
+train_loader = DataLoader(train_ds, batch_size=2, shuffle=True, num_workers=4)
 
-val_ds = CacheDataset(data=val_files, transform=val_transforms, cache_rate=1.0, num_workers=4)
+val_ds = CacheDataset(data=val_files, transform=val_transforms, cache_rate=0.5, num_workers=4)
 val_loader = DataLoader(val_ds, batch_size=1, num_workers=4)
 
 max_epochs = 100
