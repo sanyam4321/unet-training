@@ -79,7 +79,7 @@ class AttentionGate3D(nn.Module):
 
 
 class AttentionUNET3D(nn.Module):
-    def __init__(self, in_channels=1, out_channels=2):  # Adjusted default for Colon (Background + Tumor)
+    def __init__(self, in_channels=1, out_channels=2):  
         super(AttentionUNET3D, self).__init__()
         feature_maps = [64, 128, 256, 512, 1024]
         self.pool = nn.MaxPool3d(kernel_size=2, stride=2)
@@ -143,7 +143,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = AttentionUNET3D(in_channels=1, out_channels=2).to(device)
 optimizer = Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
 
-data_dir = "/workspace/Task10_Colon_Preprocessed"
+data_dir = "/home/Task10_Colon_Preprocessed"
 train_images = sorted(glob.glob(os.path.join(data_dir, "imagesTr", "colon*.nii.gz")))
 train_labels = sorted(glob.glob(os.path.join(data_dir, "labelsTr", "colon*.nii.gz")))
 
