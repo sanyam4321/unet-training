@@ -164,7 +164,7 @@ train_transforms = Compose([
         spatial_size=(128, 128, 96),
         pos=1,
         neg=1,
-        num_samples=6,
+        num_samples=4,
         image_key="image",
         image_threshold=0,
     ),
