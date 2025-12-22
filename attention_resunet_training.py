@@ -188,12 +188,12 @@ max_epochs = 100
 warmup_epochs = 10
 
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=5)
+scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=2)
 
 loss_function = DiceCELoss(to_onehot_y=True, softmax=True)
 dice_metric = DiceMetric(include_background=False, reduction="mean")
 
-val_interval = 2
+val_interval = 5
 best_metric = -1
 best_metric_epoch = -1
 
