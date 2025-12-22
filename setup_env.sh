@@ -1,5 +1,14 @@
 #!/bin/bash
 
+# 1. Copy the dataset to /home
+echo "--- Copying Dataset ---"
+if [ -d "/home/Task10_Colon_Preprocessed" ]; then
+    echo "Dataset already exists in /home, skipping copy."
+else
+    # Using -r for recursive and -p to preserve timestamps/permissions
+    cp -rp /workspace/Task10_Colon_Preprocessed /home/
+    echo "Dataset copied successfully."
+fi
 
 # 2. Install nano and essential libraries
 echo "--- Installing Nano and System Dependencies ---"
