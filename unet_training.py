@@ -207,8 +207,8 @@ import csv
 import torch
 from tqdm import tqdm
 
-max_epochs = 100
-accumulation_steps = 10
+max_epochs = 300
+accumulation_steps = 5
 val_interval = 5
 best_metric = -1
 best_metric_epoch = -1
