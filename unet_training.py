@@ -203,6 +203,12 @@ val_loader = DataLoader(
 loss_function = DiceCELoss(to_onehot_y=True, softmax=True)
 dice_metric = DiceMetric(include_background=False, reduction="mean")
 
+from monai.transforms import AsDiscrete
+
+post_pred = AsDiscrete(argmax=True, to_onehot=3)
+post_label = AsDiscrete(to_onehot=3)
+
+
 import csv
 import torch
 from tqdm import tqdm
@@ -291,9 +297,13 @@ for epoch in range(max_epochs):
                     )
                 
                 
-                val_outputs = [torch.argmax(i, dim=0, keepdim=True) for i in decollate_batch(val_outputs)]
-                val_labels = [i for i in decollate_batch(val_labels)]
-                dice_metric(y_pred=val_outputs, y=val_labels)
+                val_outputs_list = decollate_batch(val_outputs)
+                val_labels_list = decollate_batch(val_labels)
+                
+                val_outputs_convert = [post_pred(i) for i in val_outputs_list]
+                val_labels_convert = [post_label(i) for i in val_labels_list]
+                
+                dice_metric(y_pred=val_outputs_convert, y=val_labels_convert)
 
             metric = dice_metric.aggregate().item()
             current_val_metric = metric
