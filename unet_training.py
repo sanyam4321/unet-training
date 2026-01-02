@@ -180,7 +180,7 @@ train_ds = CacheDataset(
 
 train_loader = DataLoader(
     train_ds, 
-    batch_size=2, 
+    batch_size=5, 
     shuffle=True, 
     num_workers=4,
     pin_memory=True
@@ -213,7 +213,7 @@ val_interval = 5
 best_metric = -1
 best_metric_epoch = -1
 
-log_filename = "/workspace/unet_training_log.csv"
+log_filename = "/workspace/unet_training_log_run2.5.csv"
 with open(log_filename, "w", newline="") as f:
     writer = csv.writer(f)
     writer.writerow(["epoch", "train_loss", "val_dice", "best_dice"])
@@ -302,7 +302,7 @@ for epoch in range(max_epochs):
             if metric > best_metric:
                 best_metric = metric
                 best_metric_epoch = epoch + 1
-                torch.save(model.state_dict(), "/workspace/unet_baseline_best_metric_model.pth")
+                torch.save(model.state_dict(), "/workspace/unet_baseline_best_metric_model_run2.5.pth")
                 print(">>> Saved new best metric model")
 
             print(f"Current mean dice: {metric:.4f}")
