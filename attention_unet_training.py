@@ -228,7 +228,7 @@ train_ds = CacheDataset(
 
 train_loader = DataLoader(
     train_ds, 
-    batch_size=4, 
+    batch_size=5, 
     shuffle=True, 
     num_workers=4,
     pin_memory=True
@@ -256,7 +256,7 @@ import torch
 from tqdm import tqdm
 
 max_epochs = 300
-accumulation_steps = 6
+accumulation_steps = 5
 val_interval = 5
 best_metric = -1
 best_metric_epoch = -1
