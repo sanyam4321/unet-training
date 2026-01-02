@@ -67,7 +67,7 @@ class AttentionGate3D(nn.Module):
         return x * alpha
 
 class AttentionUNET3D(nn.Module):
-    def __init__(self, in_channels=1, out_channels=2):
+    def __init__(self, in_channels=1, out_channels=3):
         super(AttentionUNET3D, self).__init__()
         feature_maps = [64, 128, 256, 512, 1024]
         self.pool = nn.MaxPool3d(kernel_size=2, stride=2)
@@ -128,7 +128,6 @@ class AttentionUNET3D(nn.Module):
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = AttentionUNET3D(in_channels=1, out_channels=3).to(device)
-model = nn.DataParallel(model)
 optimizer = Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
 
 import os
