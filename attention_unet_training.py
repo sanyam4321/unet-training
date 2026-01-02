@@ -41,30 +41,40 @@ class DoubleConv(nn.Module):
 
 
 
-class AttentionGate3D(nn.Module):
-    def __init__(self, F_g, F_l, F_int, groups=8):
-        super(AttentionGate3D, self).__init__()
-        self.W_x = nn.Sequential(
-            nn.Conv3d(F_l, F_int, kernel_size=1, stride=2, padding=0, bias=False),
-            nn.GroupNorm(min(groups, F_int), F_int)
-        )
-        self.W_g = nn.Sequential(
-            nn.Conv3d(F_g, F_int, kernel_size=1, stride=1, padding=0, bias=False),
-            nn.GroupNorm(min(groups, F_int), F_int)
-        )
-        self.relu = nn.ReLU(inplace=True)
-        self.psi = nn.Conv3d(F_int, 1, kernel_size=1, stride=1, padding=0, bias=True)
-        self.upconv = nn.ConvTranspose3d(1, 1, kernel_size=2, stride=2)
-        self.sigmoid = nn.Sigmoid()
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
-    def forward(self, g, x):
-        theta_x = self.W_x(x)
-        phi_g = self.W_g(g)
-        f = self.relu(theta_x + phi_g)
-        psi_f = self.psi(f)
-        upsampled_psi = self.upconv(psi_f)
-        alpha = self.sigmoid(upsampled_psi)
-        return x * alpha
+
+class AttentionGate3D(nn.Module):
+    def __init__(self,F_g,F_l,F_int):
+        super(AttentionGate3D,self).__init__()
+        self.W_g = nn.Sequential(
+            nn.Conv3d(F_g, F_int, kernel_size=1,stride=1,padding=0,bias=True),
+            nn.BatchNorm3d(F_int)
+            )
+        
+        self.W_x = nn.Sequential(
+            nn.Conv3d(F_l, F_int, kernel_size=1,stride=1,padding=0,bias=True),
+            nn.BatchNorm3d(F_int)
+        )
+
+        self.psi = nn.Sequential(
+            nn.Conv3d(F_int, 1, kernel_size=1,stride=1,padding=0,bias=True),
+            nn.BatchNorm3d(1),
+            nn.Sigmoid()
+        )
+        
+        self.relu = nn.ReLU(inplace=True)
+        
+    def forward(self,g,x):
+        g1 = self.W_g(g)
+        x1 = self.W_x(x)
+        psi = self.relu(g1+x1)
+        psi = self.psi(psi)
+
+        return x*psi
+
 
 class AttentionUNET3D(nn.Module):
     def __init__(self, in_channels=1, out_channels=3):
@@ -79,19 +89,19 @@ class AttentionUNET3D(nn.Module):
 
         self.bottleneck = DoubleConv(feature_maps[3], feature_maps[4])
 
-        self.att4 = AttentionGate3D(F_g=feature_maps[4], F_l=feature_maps[3], F_int=feature_maps[3] // 2)
+        self.att4 = AttentionGate3D(F_g=feature_maps[3], F_l=feature_maps[3], F_int=feature_maps[3] // 2)
         self.up_conv4 = nn.ConvTranspose3d(feature_maps[4], feature_maps[3], kernel_size=2, stride=2)
         self.conv4_r = DoubleConv(2 * feature_maps[3], feature_maps[3])
 
-        self.att3 = AttentionGate3D(F_g=feature_maps[3], F_l=feature_maps[2], F_int=feature_maps[2] // 2)
+        self.att3 = AttentionGate3D(F_g=feature_maps[2], F_l=feature_maps[2], F_int=feature_maps[2] // 2)
         self.up_conv3 = nn.ConvTranspose3d(feature_maps[3], feature_maps[2], kernel_size=2, stride=2)
         self.conv3_r = DoubleConv(2 * feature_maps[2], feature_maps[2])
 
-        self.att2 = AttentionGate3D(F_g=feature_maps[2], F_l=feature_maps[1], F_int=feature_maps[1] // 2)
+        self.att2 = AttentionGate3D(F_g=feature_maps[1], F_l=feature_maps[1], F_int=feature_maps[1] // 2)
         self.up_conv2 = nn.ConvTranspose3d(feature_maps[2], feature_maps[1], kernel_size=2, stride=2)
         self.conv2_r = DoubleConv(2 * feature_maps[1], feature_maps[1])
 
-        self.att1 = AttentionGate3D(F_g=feature_maps[1], F_l=feature_maps[0], F_int=feature_maps[0] // 2)
+        self.att1 = AttentionGate3D(F_g=feature_maps[0], F_l=feature_maps[0], F_int=feature_maps[0] // 2)
         self.up_conv1 = nn.ConvTranspose3d(feature_maps[1], feature_maps[0], kernel_size=2, stride=2)
         self.conv1_r = DoubleConv(2 * feature_maps[0], feature_maps[0])
 
@@ -99,29 +109,37 @@ class AttentionUNET3D(nn.Module):
 
     def forward(self, x):
         s1 = self.conv1(x)
+        
         mp1 = self.pool(s1)
         s2 = self.conv2(mp1)
+        
         mp2 = self.pool(s2)
         s3 = self.conv3(mp2)
+        
         mp3 = self.pool(s3)
         s4 = self.conv4(mp3)
+        
         mp4 = self.pool(s4)
         bt = self.bottleneck(mp4)
 
-        at_s4 = self.att4(g=bt, x=s4)
+        
         up4 = self.up_conv4(bt)
+        at_s4 = self.att4(g=up4, x=s4)
         r_s4 = self.conv4_r(torch.cat((at_s4, up4), dim=1))
 
-        at_s3 = self.att3(g=r_s4, x=s3)
+        
         up3 = self.up_conv3(r_s4)
+        at_s3 = self.att3(g=up3, x=s3)
         r_s3 = self.conv3_r(torch.cat((at_s3, up3), dim=1))
 
-        at_s2 = self.att2(g=r_s3, x=s2)
+        
         up2 = self.up_conv2(r_s3)
+        at_s2 = self.att2(g=up2, x=s2)
         r_s2 = self.conv2_r(torch.cat((at_s2, up2), dim=1))
 
-        at_s1 = self.att1(g=r_s2, x=s1)
+        
         up1 = self.up_conv1(r_s2)
+        at_s1 = self.att1(g=up1, x=s1)
         r_s1 = self.conv1_r(torch.cat((at_s1, up1), dim=1))
 
         return self.segments(r_s1)
