@@ -23,51 +23,121 @@ from monai.metrics import DiceMetric
 from monai.inferers import sliding_window_inference
 from torch.optim import Adam
 
-class DoubleConv(nn.Module):
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class ResBlock(nn.Module):
     def __init__(self, in_channels, out_channels, groups=8):
-        super(DoubleConv, self).__init__()
-        self.conv = nn.Sequential(
+        super(ResBlock, self).__init__()
+        
+        self.conv_path = nn.Sequential(
             nn.Conv3d(in_channels, out_channels, kernel_size=3, padding=1, bias=False),
             nn.GroupNorm(min(groups, out_channels), out_channels),
             nn.ReLU(inplace=True),
+            
             nn.Conv3d(out_channels, out_channels, kernel_size=3, padding=1, bias=False),
-            nn.GroupNorm(min(groups, out_channels), out_channels),
-            nn.ReLU(inplace=True)
+            nn.GroupNorm(min(groups, out_channels), out_channels)
         )
 
+        self.shortcut = nn.Sequential()
+        if in_channels != out_channels:
+            self.shortcut = nn.Sequential(
+                nn.Conv3d(in_channels, out_channels, kernel_size=1, bias=False),
+                nn.GroupNorm(min(groups, out_channels), out_channels)
+            )
+
+        self.final_relu = nn.ReLU(inplace=True)
+
     def forward(self, x):
-        return self.conv(x)
+        residual = self.shortcut(x)
+        out = self.conv_path(x)
+        out += residual
+        out = self.final_relu(out)
+        return out
 
 
-class UNET3D(nn.Module):
+class AttentionGate3D(nn.Module):
+    def __init__(self, F_g, F_l, F_int):
+        super(AttentionGate3D, self).__init__()
+
+        self.W_x = nn.Conv3d(F_l, F_int, kernel_size=1, stride=2, padding=0, bias=True)
+        self.W_g = nn.Conv3d(F_g, F_int, kernel_size=1, stride=1, padding=0, bias=True)
+
+        self.relu = nn.ReLU(inplace=True)
+
+        self.psi = nn.Conv3d(F_int, 1, kernel_size=1, stride=1, padding=0, bias=True)
+        self.sigmoid = nn.Sigmoid()
+
+        self._init_weights()
+
+    def _init_weights(self):
+        nn.init.kaiming_normal_(self.W_x.weight, nonlinearity="relu")
+        nn.init.kaiming_normal_(self.W_g.weight, nonlinearity="relu")
+        nn.init.zeros_(self.W_x.bias)
+        nn.init.zeros_(self.W_g.bias)
+        nn.init.zeros_(self.psi.weight)
+        nn.init.constant_(self.psi.bias, 2.0)
+
+    def forward(self, g, x):
+        # 1. Downsample x to match g's size
+        theta_x = self.W_x(x) 
+        # 2. Process g
+        phi_g = self.W_g(g)
+
+        # 3. Add and Activate
+        f = self.relu(theta_x + phi_g)
+        
+        # 4. Generate attention map (small size)
+        psi = self.psi(f)
+        
+        alpha = F.interpolate(
+            psi, size=x.shape[2:], mode="trilinear", align_corners=False
+        )
+        alpha = self.sigmoid(alpha)
+
+        return x * alpha
+
+
+class Att_ResUNET3D(nn.Module):
     def __init__(self, in_channels=1, out_channels=3):
-        super(UNET3D, self).__init__()
+        super(Att_ResUNET3D, self).__init__()
 
         feature_maps = [64, 128, 256, 512, 1024]
         self.pool = nn.MaxPool3d(kernel_size=2, stride=2)
 
-        self.conv1 = DoubleConv(in_channels, feature_maps[0])
-        self.conv2 = DoubleConv(feature_maps[0], feature_maps[1])
-        self.conv3 = DoubleConv(feature_maps[1], feature_maps[2])
-        self.conv4 = DoubleConv(feature_maps[2], feature_maps[3])
+        self.conv1 = ResBlock(in_channels, feature_maps[0])
+        self.conv2 = ResBlock(feature_maps[0], feature_maps[1])
+        self.conv3 = ResBlock(feature_maps[1], feature_maps[2])
+        self.conv4 = ResBlock(feature_maps[2], feature_maps[3])
 
-        self.bottleneck = DoubleConv(feature_maps[3], feature_maps[4])
+        self.bottleneck = ResBlock(feature_maps[3], feature_maps[4])
 
+        
+        # Block 1
         self.up_conv1 = nn.ConvTranspose3d(feature_maps[4], feature_maps[3], kernel_size=2, stride=2)
-        self.conv1_r = DoubleConv(2 * feature_maps[3], feature_maps[3])
+        self.att1 = AttentionGate3D(F_g=feature_maps[4], F_l=feature_maps[3], F_int=feature_maps[3]//2)
+        self.conv1_r = ResBlock(2 * feature_maps[3], feature_maps[3])
 
+        # Block 2
         self.up_conv2 = nn.ConvTranspose3d(feature_maps[3], feature_maps[2], kernel_size=2, stride=2)
-        self.conv2_r = DoubleConv(2 * feature_maps[2], feature_maps[2])
+        self.att2 = AttentionGate3D(F_g=feature_maps[3], F_l=feature_maps[2], F_int=feature_maps[2]//2)
+        self.conv2_r = ResBlock(2 * feature_maps[2], feature_maps[2])
 
+        # Block 3
         self.up_conv3 = nn.ConvTranspose3d(feature_maps[2], feature_maps[1], kernel_size=2, stride=2)
-        self.conv3_r = DoubleConv(2 * feature_maps[1], feature_maps[1])
+        self.att3 = AttentionGate3D(F_g=feature_maps[2], F_l=feature_maps[1], F_int=feature_maps[1]//2)
+        self.conv3_r = ResBlock(2 * feature_maps[1], feature_maps[1])
 
+        # Block 4
         self.up_conv4 = nn.ConvTranspose3d(feature_maps[1], feature_maps[0], kernel_size=2, stride=2)
-        self.conv4_r = DoubleConv(2 * feature_maps[0], feature_maps[0])
+        self.att4 = AttentionGate3D(F_g=feature_maps[1], F_l=feature_maps[0], F_int=feature_maps[0]//2)
+        self.conv4_r = ResBlock(2 * feature_maps[0], feature_maps[0])
 
         self.segments = nn.Conv3d(feature_maps[0], out_channels, kernel_size=1)
 
     def forward(self, x):
+        # Encoder
         s1 = self.conv1(x)
         mp1 = self.pool(s1)
 
@@ -82,22 +152,27 @@ class UNET3D(nn.Module):
 
         bt = self.bottleneck(mp4)
 
+        s4_att = self.att1(g=bt, x=s4)
         up1 = self.up_conv1(bt)
-        r_s4 = self.conv1_r(torch.cat((s4, up1), dim=1))
+        r_s4 = self.conv1_r(torch.cat((s4_att, up1), dim=1))
 
+        s3_att = self.att2(g=r_s4, x=s3)
         up2 = self.up_conv2(r_s4)
-        r_s3 = self.conv2_r(torch.cat((s3, up2), dim=1))
+        r_s3 = self.conv2_r(torch.cat((s3_att, up2), dim=1))
 
+        s2_att = self.att3(g=r_s3, x=s2)
         up3 = self.up_conv3(r_s3)
-        r_s2 = self.conv3_r(torch.cat((s2, up3), dim=1))
+        r_s2 = self.conv3_r(torch.cat((s2_att, up3), dim=1))
 
+        s1_att = self.att4(g=r_s2, x=s1)
         up4 = self.up_conv4(r_s2)
-        r_s1 = self.conv4_r(torch.cat((s1, up4), dim=1))
+        r_s1 = self.conv4_r(torch.cat((s1_att, up4), dim=1))
 
         return self.segments(r_s1)
 
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = UNET3D(in_channels=1, out_channels=3).to(device)
+model = Att_ResUNET3D(in_channels=1, out_channels=3).to(device)
 optimizer = Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
 
 import os
