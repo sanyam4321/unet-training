@@ -23,51 +23,72 @@ from monai.metrics import DiceMetric
 from monai.inferers import sliding_window_inference
 from torch.optim import Adam
 
-class DoubleConv(nn.Module):
+import torch
+import torch.nn as nn
+
+class ResBlock(nn.Module):
     def __init__(self, in_channels, out_channels, groups=8):
-        super(DoubleConv, self).__init__()
-        self.conv = nn.Sequential(
+        super(ResBlock, self).__init__()
+        
+        self.conv_path = nn.Sequential(
             nn.Conv3d(in_channels, out_channels, kernel_size=3, padding=1, bias=False),
             nn.GroupNorm(min(groups, out_channels), out_channels),
             nn.ReLU(inplace=True),
+            
             nn.Conv3d(out_channels, out_channels, kernel_size=3, padding=1, bias=False),
-            nn.GroupNorm(min(groups, out_channels), out_channels),
-            nn.ReLU(inplace=True)
+            nn.GroupNorm(min(groups, out_channels), out_channels)
         )
 
+        self.shortcut = nn.Sequential()
+        if in_channels != out_channels:
+            self.shortcut = nn.Sequential(
+                nn.Conv3d(in_channels, out_channels, kernel_size=1, bias=False),
+                nn.GroupNorm(min(groups, out_channels), out_channels)
+            )
+
+        self.final_relu = nn.ReLU(inplace=True)
+
     def forward(self, x):
-        return self.conv(x)
+        residual = self.shortcut(x)
+        out = self.conv_path(x)
+        
+        out += residual
+        
+        out = self.final_relu(out)
+        return out
 
 
-class UNET3D(nn.Module):
+class ResUNET3D(nn.Module):
     def __init__(self, in_channels=1, out_channels=3):
-        super(UNET3D, self).__init__()
+        super(ResUNET3D, self).__init__()
 
         feature_maps = [64, 128, 256, 512, 1024]
         self.pool = nn.MaxPool3d(kernel_size=2, stride=2)
 
-        self.conv1 = DoubleConv(in_channels, feature_maps[0])
-        self.conv2 = DoubleConv(feature_maps[0], feature_maps[1])
-        self.conv3 = DoubleConv(feature_maps[1], feature_maps[2])
-        self.conv4 = DoubleConv(feature_maps[2], feature_maps[3])
+        self.conv1 = ResBlock(in_channels, feature_maps[0])
+        self.conv2 = ResBlock(feature_maps[0], feature_maps[1])
+        self.conv3 = ResBlock(feature_maps[1], feature_maps[2])
+        self.conv4 = ResBlock(feature_maps[2], feature_maps[3])
 
-        self.bottleneck = DoubleConv(feature_maps[3], feature_maps[4])
+        self.bottleneck = ResBlock(feature_maps[3], feature_maps[4])
 
         self.up_conv1 = nn.ConvTranspose3d(feature_maps[4], feature_maps[3], kernel_size=2, stride=2)
-        self.conv1_r = DoubleConv(2 * feature_maps[3], feature_maps[3])
+        
+        self.conv1_r = ResBlock(2 * feature_maps[3], feature_maps[3])
 
         self.up_conv2 = nn.ConvTranspose3d(feature_maps[3], feature_maps[2], kernel_size=2, stride=2)
-        self.conv2_r = DoubleConv(2 * feature_maps[2], feature_maps[2])
+        self.conv2_r = ResBlock(2 * feature_maps[2], feature_maps[2])
 
         self.up_conv3 = nn.ConvTranspose3d(feature_maps[2], feature_maps[1], kernel_size=2, stride=2)
-        self.conv3_r = DoubleConv(2 * feature_maps[1], feature_maps[1])
+        self.conv3_r = ResBlock(2 * feature_maps[1], feature_maps[1])
 
         self.up_conv4 = nn.ConvTranspose3d(feature_maps[1], feature_maps[0], kernel_size=2, stride=2)
-        self.conv4_r = DoubleConv(2 * feature_maps[0], feature_maps[0])
+        self.conv4_r = ResBlock(2 * feature_maps[0], feature_maps[0])
 
         self.segments = nn.Conv3d(feature_maps[0], out_channels, kernel_size=1)
 
     def forward(self, x):
+       
         s1 = self.conv1(x)
         mp1 = self.pool(s1)
 
@@ -83,6 +104,7 @@ class UNET3D(nn.Module):
         bt = self.bottleneck(mp4)
 
         up1 = self.up_conv1(bt)
+       
         r_s4 = self.conv1_r(torch.cat((s4, up1), dim=1))
 
         up2 = self.up_conv2(r_s4)
@@ -97,7 +119,7 @@ class UNET3D(nn.Module):
         return self.segments(r_s1)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = UNET3D(in_channels=1, out_channels=3).to(device)
+model = ResUNET3D(in_channels=1, out_channels=3).to(device)
 optimizer = Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
 
 import os
